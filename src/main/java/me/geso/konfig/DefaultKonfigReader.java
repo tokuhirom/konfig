@@ -83,7 +83,7 @@ public class DefaultKonfigReader implements KonfigReader {
                     current = ((Map) current).get(item);
                 }
             } else {
-                log.info("TBD");
+                log.info("This element is not a Map: {}. Path:{}", config, pathValue);
             }
         }
     }
