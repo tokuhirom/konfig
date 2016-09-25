@@ -2,6 +2,14 @@
 
 Tiny config loader for Java
 
+## SYNOPSIS
+
+```java
+ConfigReader reader = new ConfigReaderBuilder()
+        .build();
+ConfigFile config = reader.read(ConfigFile.class);
+```
+
 ## Usage
 
 ### Load from resources
@@ -23,7 +31,43 @@ config loads it.
 
     java -Dconfig.file=path/to/config.yml
 
-###
+## Customize your config reader
+
+### setConfigFilePrefix
+
+Set prefix of configuration file resource.
+
+Default value is `config-`.
+
+```java
+ConfigReader configReader = ConfigReaderBuilder.create()
+    .setConfigFilePrefix("application-")
+    .build();
+```
+
+### setConfigFileProperty
+
+Set configuration file name property name.
+
+Default value is `config.file`.
+
+```java
+ConfigReader configReader = ConfigReaderBuilder.create()
+    .setConfigFileProperty("config.location")
+    .build();
+```
+
+### setConfigProfileProperty
+
+Set property name for configuration profile.
+
+Default value is `config.profile`.
+
+```java
+ConfigReader configReader = ConfigReaderBuilder.create()
+    .setConfigProfileProperty("myapp.env")
+    .build();
+```
 
 ## Overwrite configuration at runtime
 

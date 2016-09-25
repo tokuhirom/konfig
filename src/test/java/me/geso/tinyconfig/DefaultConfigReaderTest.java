@@ -22,7 +22,7 @@ public class DefaultConfigReaderTest {
 
     @Test
     public void read() throws Exception {
-        ConfigReader reader = new ConfigReaderBuilder()
+        ConfigReader reader = ConfigReaderBuilder.create()
                 .build();
         ConfigFile config = reader.read(ConfigFile.class);
         assertThat(config.getEnv())
@@ -31,7 +31,7 @@ public class DefaultConfigReaderTest {
 
     @Test
     public void readWithReleaseProfile() throws Exception {
-        ConfigReader reader = new ConfigReaderBuilder()
+        ConfigReader reader = ConfigReaderBuilder.create()
                 .build();
         System.setProperty(ConfigReaderBuilder.DEFAULT_CONFIG_PROFILE_PROPERTY,
                 "release");
@@ -42,7 +42,7 @@ public class DefaultConfigReaderTest {
 
     @Test
     public void rewriteByProperty() throws Exception {
-        ConfigReader reader = new ConfigReaderBuilder()
+        ConfigReader reader = ConfigReaderBuilder.create()
                 .build();
         System.setProperty("dataSource.uri", "jdbc:pg:");
         ConfigFile config = reader.read(ConfigFile.class);
@@ -54,7 +54,7 @@ public class DefaultConfigReaderTest {
 
     @Test
     public void rewriteByEnv() throws Exception {
-        ConfigReader reader = new ConfigReaderBuilder()
+        ConfigReader reader = ConfigReaderBuilder.create()
                 .build();
         setEnv(ImmutableMap.<String, String>builder()
                 .put("DATA_SOURCE_URI", "jdbc:pg:")
@@ -68,7 +68,7 @@ public class DefaultConfigReaderTest {
 
     @Test
     public void rewriteFromEmpty() throws Exception {
-        ConfigReader reader = new ConfigReaderBuilder()
+        ConfigReader reader = ConfigReaderBuilder.create()
                 .build();
         System.setProperty("dataSource.uri", "jdbc:pg:");
         ConfigFile config = reader.read(ConfigFile.class, "empty");
