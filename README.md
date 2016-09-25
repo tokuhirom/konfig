@@ -4,7 +4,7 @@ Tiny config loader for Java
 
 ## Usage
 
-### Load by `$profile`
+### Load from resources
 
 Konfig loads `konfig-${profile}.yml` from resource by default.
 Default `$profile` is `local`. You can overwrite `$profile` by `-Dkonfig.profile`
