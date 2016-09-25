@@ -20,6 +20,7 @@ import java.util.*;
 public class DefaultKonfigReader implements KonfigReader {
     public static final String KONFIG_FILE_PROPERTY = "konfig.file";
     public static final String KONFIG_PROFILE_PROPERTY = "konfig.profile";
+    public static final String KONFIG_FILE_PREFIX = "konfig-";
 
     private final ObjectMapper objectMapper;
     private final List<ValueLoader> valueLoaders = ImmutableList.of(
@@ -143,7 +144,7 @@ public class DefaultKonfigReader implements KonfigReader {
             return objectMapper.readValue(new File(configFile), Object.class);
         }
 
-        String resourceName = "konfig-" + profile + ".yml";
+        String resourceName = KONFIG_FILE_PREFIX + profile + ".yml";
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourceName)) {
             if (inputStream != null) {
                 log.info("Reading configuration from resource: " + resourceName);
@@ -154,7 +155,7 @@ public class DefaultKonfigReader implements KonfigReader {
         throw new IllegalStateException("There's no `konfig.file` system profile property and no resource named `" + resourceName + "`.");
     }
 
-    private String getProfile() {
+    public String getProfile() {
         return System.getProperty(KONFIG_PROFILE_PROPERTY, "local");
     }
 
