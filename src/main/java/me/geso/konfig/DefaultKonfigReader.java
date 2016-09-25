@@ -5,15 +5,18 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Primitives;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
+import org.yaml.snakeyaml.Yaml;
 
 import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
-import java.io.File;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
 @Slf4j
@@ -27,9 +30,13 @@ public class DefaultKonfigReader implements KonfigReader {
             new EnvValueLoader(),
             new PropertyValueLoader()
     );
+    private final Yaml yaml;
 
     public DefaultKonfigReader(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        ImportableConstructor importableConstructor = new ImportableConstructor();
+        this.yaml = new Yaml(importableConstructor);
+        importableConstructor.setYaml(yaml);
     }
 
     @Override
@@ -37,7 +44,7 @@ public class DefaultKonfigReader implements KonfigReader {
         Object config = readInternal(profile);
         List<PathValue> pathValues = scanValues(klass);
         rewriteValues(config, pathValues);
-        byte[] bytes = this.objectMapper.writeValueAsBytes(config);
+        String bytes = yaml.dump(config);
         return this.objectMapper.readValue(bytes, klass);
     }
 
@@ -141,14 +148,16 @@ public class DefaultKonfigReader implements KonfigReader {
         String configFile = System.getProperty(KONFIG_FILE_PROPERTY);
         if (configFile != null) {
             log.info("Reading configuration from " + configFile);
-            return objectMapper.readValue(new File(configFile), Object.class);
+            try (BufferedReader reader = Files.newBufferedReader(Paths.get(configFile))) {
+                return yaml.load(reader);
+            }
         }
 
         String resourceName = KONFIG_FILE_PREFIX + profile + ".yml";
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourceName)) {
             if (inputStream != null) {
                 log.info("Reading configuration from resource: " + resourceName);
-                return objectMapper.readValue(inputStream, Object.class);
+                return yaml.load(inputStream);
             }
         }
 

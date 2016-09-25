@@ -16,12 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class DefaultKonfigReaderTest {
     @Before
     public void before() {
-        log.info("Hello");
         System.clearProperty(DefaultKonfigReader.KONFIG_FILE_PROPERTY);
         System.clearProperty(DefaultKonfigReader.KONFIG_PROFILE_PROPERTY);
-
-        log.info("Hello");
-
     }
 
     @Test
