@@ -1,5 +1,0 @@
----
-env: release
-dataSource:
-  uri: "jdbc:mysql:"
-foo: !file foobar.yml

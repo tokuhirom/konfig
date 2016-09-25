@@ -1,4 +1,4 @@
-# konfig
+# tinyconfig
 
 Tiny config loader for Java
 
@@ -6,22 +6,22 @@ Tiny config loader for Java
 
 ### Load from resources
 
-Konfig loads `konfig-${profile}.yml` from resource by default.
-Default `$profile` is `local`. You can overwrite `$profile` by `-Dkonfig.profile`
+TinyConfig loads `tinyconfig-${profile}.yml` from resource by default.
+Default `$profile` is `local`. You can overwrite `$profile` by `-Dconfig.profile`
 system property.
 
-    # load konfig-release.yml from resources
-    java -Dkonfig.profile=release
+    # load config-release.yml from resources
+    java -Dconfig.profile=release
 
-    # load konfig-staging.yml from resources
-    java -Dkonfig.profile=staging
+    # load config-staging.yml from resources
+    java -Dconfig.profile=staging
 
 ### Load from specified file
 
-If there's a configuration file specified by `konfig.file` system property,
-konfig loads it.
+If there's a configuration file specified by `config.file` system property,
+config loads it.
 
-    java -Dkonfig.file=path/to/config.yml
+    java -Dconfig.file=path/to/config.yml
 
 ###
 
@@ -61,13 +61,17 @@ logging.
 
 ## Include YAML
 
-You can include YAML from YAML. Konfig defines custom tag for including.
+You can include YAML from YAML. TinyConfig defines custom tag for including.
 
 ```yaml
 ---
 mybatis: !file /etc/mybatis.yml
 freemarker: !resource config/freemarker-devel.yml
 ```
+
+`!file` includes YAML from file.
+
+`!resource` includes YAML from classpath.
 
 ## Supported Java version
 
