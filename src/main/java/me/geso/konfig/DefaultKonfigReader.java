@@ -1,8 +1,10 @@
 package me.geso.konfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.CaseFormat;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.Primitives;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
 import java.beans.BeanInfo;
@@ -12,9 +14,8 @@ import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Set;
+import java.util.*;
 
 @Slf4j
 public class DefaultKonfigReader implements KonfigReader {
@@ -36,116 +37,106 @@ public class DefaultKonfigReader implements KonfigReader {
             );
 
     private final ObjectMapper objectMapper;
+    private final List<ValueLoader> valueLoaders = ImmutableList.of(
+            new EnvValueLoader(),
+            new PropertyValueLoader()
+    );
 
     public DefaultKonfigReader(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     @Override
+    public <T> T read(@NonNull Class<T> klass, @NonNull String profile) throws IOException {
+        Object config = readInternal(Object.class, profile);
+        replaceValues(klass, config);
+        byte[] bytes = this.objectMapper.writeValueAsBytes(config);
+        return this.objectMapper.readValue(bytes, klass);
+    }
+
+    @Override
     public <T> T read(Class<T> klass) throws IOException {
-        T config = readInternal(klass, getProfile());
-        replaceValuesBySystemProperty(config);
-        return config;
+        return read(klass, getProfile());
     }
 
-    private <T> void replaceValuesBySystemProperty(T config) {
-        doReplace(config, null);
+    private void replaceValues(Class<?> klass, Object config) {
+        doReplace(klass, config, Collections.emptyList());
     }
 
-    private <T> void doReplace(T config, String prefix) {
-        Class<?> aClass = config.getClass();
+    private <T> void doReplace(Class<?> klass, Object config, List<String> path) {
+        log.trace("replacing config for {}",
+                klass);
         try {
-            BeanInfo beanInfo = Introspector.getBeanInfo(aClass, Object.class);
+            BeanInfo beanInfo = Introspector.getBeanInfo(klass, Object.class);
             for (PropertyDescriptor propertyDescriptor : beanInfo.getPropertyDescriptors()) {
-                Method writeMethod = propertyDescriptor.getWriteMethod();
-                if (writeMethod != null) {
-                    Class<?>[] parameterTypes = writeMethod.getParameterTypes();
-                    if (parameterTypes.length == 1) {
-                        Class<?> parameterType = parameterTypes[0];
-                        if (SUPPORTED_TYPES.contains(parameterType)) {
-                            rewriteByProperty(config, prefix, propertyDescriptor.getName(), writeMethod);
-                            rewriteByEnv(config, prefix, propertyDescriptor.getName(), writeMethod);
-                        } else {
-                            log.debug("Skip non-primitive property: prefix:{} writer:{}",
-                                    prefix,
-                                    writeMethod.getName());
-                        }
-                    }
+                Class<?> propertyType = propertyDescriptor.getPropertyType();
+                if (SUPPORTED_TYPES.contains(propertyType)) {
+                    writeValue(propertyDescriptor, config, path);
+                } else if (propertyType.isPrimitive()) {
+                    log.trace("Ignore non-supported primitive type '{}' for '{}.{}'",
+                            propertyType, path, propertyDescriptor.getName());
+                } else if (Primitives.isWrapperType(propertyType)) {
+                    log.trace("Ignore non-supported wrapper type: {}",
+                            propertyType);
+                } else {
+                    readValue(propertyDescriptor, config, path, klass);
                 }
 
-                Method readMethod = propertyDescriptor.getReadMethod();
-                if (readMethod != null) {
-                    Class<?> returnType = readMethod.getReturnType();
-                    if (!(returnType.isPrimitive() || SUPPORTED_TYPES.contains(returnType))) {
-                        try {
-                            Object child = readMethod.invoke(config);
-                            String newPrefix = (prefix == null ? "" : prefix + ".") + propertyDescriptor.getName();
-                            log.trace("Handling child: {} => {}", aClass.getName(), propertyDescriptor.getName());
-                            doReplace(child, newPrefix);
-                        } catch (IllegalAccessException | InvocationTargetException e) {
-                            log.debug("Cannot access property: {}.{}: {}", aClass.getCanonicalName(), readMethod.getName(), e.getMessage());
-                        }
-                    } else {
-                        log.trace("Skip primitive types for reading: {}.{}", aClass.getName(), propertyDescriptor.getName());
-                    }
-                }
             }
         } catch (IntrospectionException e) {
-            log.info("Can't read bean info: {}({})", aClass, e.getMessage());
+            log.info("Can't read bean info: {}({})", klass, e.getMessage());
         }
     }
 
+    private void readValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path, Class<?> klass) {
+        List<String> newPath = ImmutableList.<String>builder()
+                .addAll(path)
+                .add(propertyDescriptor.getName())
+                .build();
 
-    private <T> void rewriteByEnv(T config, String prefix, String name, Method writeMethod) {
-        String envName = (prefix == null ? "" : prefix + "_") + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, name);
-        String value = System.getenv(envName);
-        if (value == null) {
+        if (config instanceof Map) {
+            Object child = ((Map) config).get(propertyDescriptor.getName());
+            log.trace("Handling child: {} => {}", klass.getName(), propertyDescriptor.getName());
+            doReplace(propertyDescriptor.getPropertyType(), child, newPath);
+        } else {
+            log.trace("{}: {} is not a map", newPath, config);
+        }
+    }
+
+    private void writeValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path) {
+        Method writeMethod = propertyDescriptor.getWriteMethod();
+        if (writeMethod == null) {
+            log.trace("There's no writer method. Path:{}, Property:{}",
+                    path, propertyDescriptor.getName());
             return;
         }
 
-        setValue(config, writeMethod, "Env: " + envName, value);
+        List<String> newPath = ImmutableList.<String>builder()
+                .addAll(path)
+                .add(propertyDescriptor.getName())
+                .build();
+
+        log.trace("Writing value: {}", newPath);
+        valueLoaders.stream()
+                .map(valueLoader -> valueLoader.getValue(newPath))
+                .filter(Optional::isPresent)
+                .findFirst()
+                .map(Optional::get)
+                .ifPresent(it -> setValue(config, newPath, it));
     }
 
-    private <T> void rewriteByProperty(T config, String prefix, String name, Method writeMethod) {
-        String propertyName = (prefix == null ? "" : prefix + ".") + name;
-        String value = System.getProperty(propertyName);
-        log.trace("Reading property: {}. Value: {}",
-                propertyName,
-                value);
-        if (value != null) {
-            setValue(config, writeMethod, "Property: " + propertyName, value);
-        }
-    }
+    private void setValue(Object config, List<String> path, String value) {
+        log.trace("Putting value: {} -> {}", path, value);
 
-    private <T> void setValue(T config, Method writeMethod, String name, String value) {
-        Class<?>[] parameterTypes = writeMethod.getParameterTypes();
-        if (parameterTypes.length != 1) {
-            log.debug("This is not a writer method: {}", writeMethod);
+        String last = path.get(path.size() - 1);
+
+        if (config instanceof Map) {
+            // last item. Just set a value.
+            log.info("Put value: {} -> {}", path, value);
+            ((Map) config).put(last, value);
+        } else {
+            log.info("Cannot set value for {}. There's non-Map value in a path. Value: {}", path, value);
             return;
-        }
-        Class<?> parameterType = parameterTypes[0];
-        try {
-            if (parameterType == String.class) {
-                writeMethod.invoke(config, value);
-            } else if (parameterType == short.class || parameterType == Short.class) {
-                writeMethod.invoke(config, Short.valueOf(value));
-            } else if (parameterType == int.class || parameterType == Integer.class) {
-                writeMethod.invoke(config, Integer.valueOf(value));
-            } else if (parameterType == long.class || parameterType == Long.class) {
-                writeMethod.invoke(config, Long.valueOf(value));
-            } else if (parameterType == float.class || parameterType == Float.class) {
-                writeMethod.invoke(config, Float.valueOf(value));
-            } else if (parameterType == double.class || parameterType == Double.class) {
-                writeMethod.invoke(config, Double.valueOf(value));
-            } else {
-                log.info("Can't set property: {}. parameter type '{}' is not supported. Supported types are 'int', 'short', 'long', and 'String'", value, parameterType);
-            }
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            log.info("Cannot set value: {} <- {}. Type: {}({})",
-                    name,
-                    value,
-                    parameterType.getName(),
-                    e.getMessage());
         }
     }
 

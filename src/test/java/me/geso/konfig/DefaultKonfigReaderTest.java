@@ -19,7 +19,7 @@ public class DefaultKonfigReaderTest {
         log.info("Hello");
         System.clearProperty(DefaultKonfigReader.KONFIG_FILE_PROPERTY);
         System.clearProperty(DefaultKonfigReader.KONFIG_PROFILE_PROPERTY);
-        
+
         log.info("Hello");
 
     }
@@ -61,11 +61,21 @@ public class DefaultKonfigReaderTest {
         KonfigReader reader = new KonfigReaderBuilder()
                 .build();
         setEnv(ImmutableMap.<String, String>builder()
-                .put("DATASOURCE_URI", "jdbc:pg:")
+                .put("DATA_SOURCE_URI", "jdbc:pg:")
                 .build());
         ConfigFile config = reader.read(ConfigFile.class);
         assertThat(config.getEnv())
                 .isEqualTo("local");
+        assertThat(config.getDataSource().getUri())
+                .isEqualTo("jdbc:pg:");
+    }
+
+    @Test
+    public void rewriteFromEmpty() throws Exception {
+        KonfigReader reader = new KonfigReaderBuilder()
+                .build();
+        System.setProperty("dataSource.uri", "jdbc:pg:");
+        ConfigFile config = reader.read(ConfigFile.class, "empty");
         assertThat(config.getDataSource().getUri())
                 .isEqualTo("jdbc:pg:");
     }
