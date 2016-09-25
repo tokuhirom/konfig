@@ -2,7 +2,6 @@ package me.geso.konfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Primitives;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -21,20 +20,6 @@ import java.util.*;
 public class DefaultKonfigReader implements KonfigReader {
     public static final String KONFIG_FILE_PROPERTY = "konfig.file";
     public static final String KONFIG_PROFILE_PROPERTY = "konfig.profile";
-    private static final Set<Class<?>> SUPPORTED_TYPES =
-            ImmutableSet.of(
-                    Long.class,
-                    long.class,
-                    Integer.class,
-                    int.class,
-                    Short.class,
-                    short.class,
-                    Double.class,
-                    double.class,
-                    Float.class,
-                    float.class,
-                    String.class
-            );
 
     private final ObjectMapper objectMapper;
     private final List<ValueLoader> valueLoaders = ImmutableList.of(
@@ -48,7 +33,7 @@ public class DefaultKonfigReader implements KonfigReader {
 
     @Override
     public <T> T read(@NonNull Class<T> klass, @NonNull String profile) throws IOException {
-        Object config = readInternal(Object.class, profile);
+        Object config = readInternal(profile);
         List<PathValue> pathValues = scanValues(klass);
         rewriteValues(config, pathValues);
         byte[] bytes = this.objectMapper.writeValueAsBytes(config);
@@ -151,18 +136,18 @@ public class DefaultKonfigReader implements KonfigReader {
         return Optional.empty();
     }
 
-    private <T> T readInternal(Class<T> klass, String profile) throws IOException {
+    private Object readInternal(String profile) throws IOException {
         String configFile = System.getProperty(KONFIG_FILE_PROPERTY);
         if (configFile != null) {
             log.info("Reading configuration from " + configFile);
-            return objectMapper.readValue(new File(configFile), klass);
+            return objectMapper.readValue(new File(configFile), Object.class);
         }
 
         String resourceName = "konfig-" + profile + ".yml";
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourceName)) {
             if (inputStream != null) {
                 log.info("Reading configuration from resource: " + resourceName);
-                return objectMapper.readValue(inputStream, klass);
+                return objectMapper.readValue(inputStream, Object.class);
             }
         }
 
