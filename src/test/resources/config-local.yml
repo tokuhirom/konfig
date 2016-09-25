@@ -1,0 +1,4 @@
+---
+env: local
+dataSource:
+  uri: "jdbc:h2:mem"
