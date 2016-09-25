@@ -23,7 +23,51 @@ konfig loads it.
 
     java -Dkonfig.file=path/to/config.yml
 
-## Property resolution
+###
+
+## Overwrite configuration at runtime
+
+You can overwrite configurations at runtime by environment variable and
+system properties.
+
+For example, declare the following configuration file model.
+
+```java
+@Data
+public static class ConfigFile {
+    private String env;
+    private DataSourceConfig dataSource;
+
+    @Data
+    public static class DataSourceConfig {
+        private String uri;
+    }
+}
+```
+
+### System properties
+
+You can overwrite dataSource.uri via `-DdataSource.uri`.
+
+### Environment variable
+
+You can write overwrite configuration by environment variable.
+
+If there's a configuration file like this, you can overwrite dataSource.uri by
+`ENV['DATA_SOURCE_URI']`.
+
+If you want to check the real environment variable name, you can enable the TRACE level
+logging.
+
+## Include YAML
+
+You can include YAML from YAML. Konfig defines custom tag for including.
+
+```yaml
+---
+mybatis: !file /etc/mybatis.yml
+freemarker: !resource config/freemarker-devel.yml
+```
 
 ## Supported Java version
 
