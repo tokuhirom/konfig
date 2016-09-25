@@ -17,12 +17,16 @@ public class EnvValueLoader implements ValueLoader {
     }
 
     @Override
-    public Optional<String> getValue(List<String> path) {
+    public Optional<PathValue> getValue(List<String> path) {
         String name = getName(path);
         String env = System.getenv(name);
         if (log.isTraceEnabled()) {
             log.trace("environment variable '{}': {}", name, env);
         }
-        return Optional.ofNullable(env);
+        if (env == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(new PathValue(path, env, this.getClass()));
+        }
     }
 }

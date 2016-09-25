@@ -49,9 +49,43 @@ public class DefaultKonfigReader implements KonfigReader {
     @Override
     public <T> T read(@NonNull Class<T> klass, @NonNull String profile) throws IOException {
         Object config = readInternal(Object.class, profile);
-        replaceValues(klass, config);
+        List<PathValue> pathValues = scanValues(klass, config);
+        rewriteValues(config, pathValues);
         byte[] bytes = this.objectMapper.writeValueAsBytes(config);
         return this.objectMapper.readValue(bytes, klass);
+    }
+
+    private void rewriteValues(Object config, List<PathValue> pathValues) {
+        for (PathValue pathValue : pathValues) {
+            rewriteValue(config, pathValue);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void rewriteValue(Object config, PathValue pathValue) {
+        log.info("Rewrite value: {}", pathValue);
+        Object current = config;
+        List<String> path = pathValue.getPath();
+        for (int i = 0; i < path.size(); i++) {
+            String item = path.get(i);
+            boolean last = i == path.size() - 1;
+            if (current instanceof Map) {
+                if (last) {
+                    log.info("Put value: {}={}",
+                            path,
+                            pathValue.getValue());
+                    ((Map) current).put(item, pathValue.getValue());
+                } else {
+                    // `current{item} //= {}`
+                    if (!((Map) current).containsKey(item)) {
+                        ((Map) current).put(item, new LinkedHashMap<>());
+                    }
+                    current = ((Map) current).get(item);
+                }
+            } else {
+                log.info("TBD");
+            }
+        }
     }
 
     @Override
@@ -59,19 +93,22 @@ public class DefaultKonfigReader implements KonfigReader {
         return read(klass, getProfile());
     }
 
-    private void replaceValues(Class<?> klass, Object config) {
-        doReplace(klass, config, Collections.emptyList());
+    private List<PathValue> scanValues(Class<?> klass, Object config) {
+        return doScan(klass, config, Collections.emptyList());
     }
 
-    private <T> void doReplace(Class<?> klass, Object config, List<String> path) {
+    // ToDO deprecate 'config' argument.
+    private <T> List<PathValue> doScan(Class<?> klass, Object config, List<String> path) {
         log.trace("replacing config for {}",
                 klass);
+        List<PathValue> pathValues = new ArrayList<>();
         try {
             BeanInfo beanInfo = Introspector.getBeanInfo(klass, Object.class);
             for (PropertyDescriptor propertyDescriptor : beanInfo.getPropertyDescriptors()) {
                 Class<?> propertyType = propertyDescriptor.getPropertyType();
                 if (SUPPORTED_TYPES.contains(propertyType)) {
-                    writeValue(propertyDescriptor, config, path);
+                    scanSupportedValue(propertyDescriptor, config, path)
+                            .ifPresent(pathValues::add);
                 } else if (propertyType.isPrimitive()) {
                     log.trace("Ignore non-supported primitive type '{}' for '{}.{}'",
                             propertyType, path, propertyDescriptor.getName());
@@ -79,16 +116,16 @@ public class DefaultKonfigReader implements KonfigReader {
                     log.trace("Ignore non-supported wrapper type: {}",
                             propertyType);
                 } else {
-                    readValue(propertyDescriptor, config, path, klass);
+                    pathValues.addAll(scanValue(propertyDescriptor, config, path, klass));
                 }
-
             }
         } catch (IntrospectionException e) {
             log.info("Can't read bean info: {}({})", klass, e.getMessage());
         }
+        return pathValues;
     }
 
-    private void readValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path, Class<?> klass) {
+    private List<PathValue> scanValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path, Class<?> klass) {
         List<String> newPath = ImmutableList.<String>builder()
                 .addAll(path)
                 .add(propertyDescriptor.getName())
@@ -97,18 +134,19 @@ public class DefaultKonfigReader implements KonfigReader {
         if (config instanceof Map) {
             Object child = ((Map) config).get(propertyDescriptor.getName());
             log.trace("Handling child: {} => {}", klass.getName(), propertyDescriptor.getName());
-            doReplace(propertyDescriptor.getPropertyType(), child, newPath);
+            return doScan(propertyDescriptor.getPropertyType(), child, newPath);
         } else {
             log.trace("{}: {} is not a map", newPath, config);
+            return Collections.emptyList();
         }
     }
 
-    private void writeValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path) {
+    private Optional<PathValue> scanSupportedValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path) {
         Method writeMethod = propertyDescriptor.getWriteMethod();
         if (writeMethod == null) {
             log.trace("There's no writer method. Path:{}, Property:{}",
                     path, propertyDescriptor.getName());
-            return;
+            return Optional.empty();
         }
 
         List<String> newPath = ImmutableList.<String>builder()
@@ -117,27 +155,13 @@ public class DefaultKonfigReader implements KonfigReader {
                 .build();
 
         log.trace("Writing value: {}", newPath);
-        valueLoaders.stream()
-                .map(valueLoader -> valueLoader.getValue(newPath))
-                .filter(Optional::isPresent)
-                .findFirst()
-                .map(Optional::get)
-                .ifPresent(it -> setValue(config, newPath, it));
-    }
-
-    private void setValue(Object config, List<String> path, String value) {
-        log.trace("Putting value: {} -> {}", path, value);
-
-        String last = path.get(path.size() - 1);
-
-        if (config instanceof Map) {
-            // last item. Just set a value.
-            log.info("Put value: {} -> {}", path, value);
-            ((Map) config).put(last, value);
-        } else {
-            log.info("Cannot set value for {}. There's non-Map value in a path. Value: {}", path, value);
-            return;
+        for (ValueLoader valueLoader : valueLoaders) {
+            Optional<PathValue> value = valueLoader.getValue(newPath);
+            if (value.isPresent()) {
+                return value;
+            }
         }
+        return Optional.empty();
     }
 
     private <T> T readInternal(Class<T> klass, String profile) throws IOException {

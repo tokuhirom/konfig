@@ -15,12 +15,16 @@ public class PropertyValueLoader implements ValueLoader {
     }
 
     @Override
-    public Optional<String> getValue(List<String> path) {
+    public Optional<PathValue> getValue(List<String> path) {
         String name = getName(path);
         String property = System.getProperty(name);
         if (log.isTraceEnabled()) {
             log.trace("property value '{}': {}", name, property);
         }
-        return Optional.ofNullable(property);
+        if (property == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(new PathValue(path, property, this.getClass()));
+        }
     }
 }
