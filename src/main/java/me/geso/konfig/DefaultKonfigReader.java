@@ -49,7 +49,7 @@ public class DefaultKonfigReader implements KonfigReader {
     @Override
     public <T> T read(@NonNull Class<T> klass, @NonNull String profile) throws IOException {
         Object config = readInternal(Object.class, profile);
-        List<PathValue> pathValues = scanValues(klass, config);
+        List<PathValue> pathValues = scanValues(klass);
         rewriteValues(config, pathValues);
         byte[] bytes = this.objectMapper.writeValueAsBytes(config);
         return this.objectMapper.readValue(bytes, klass);
@@ -93,12 +93,11 @@ public class DefaultKonfigReader implements KonfigReader {
         return read(klass, getProfile());
     }
 
-    private List<PathValue> scanValues(Class<?> klass, Object config) {
-        return doScan(klass, config, Collections.emptyList());
+    private List<PathValue> scanValues(Class<?> klass) {
+        return doScan(klass, Collections.emptyList());
     }
 
-    // ToDO deprecate 'config' argument.
-    private <T> List<PathValue> doScan(Class<?> klass, Object config, List<String> path) {
+    private <T> List<PathValue> doScan(Class<?> klass, List<String> path) {
         log.trace("replacing config for {}",
                 klass);
         List<PathValue> pathValues = new ArrayList<>();
@@ -106,17 +105,11 @@ public class DefaultKonfigReader implements KonfigReader {
             BeanInfo beanInfo = Introspector.getBeanInfo(klass, Object.class);
             for (PropertyDescriptor propertyDescriptor : beanInfo.getPropertyDescriptors()) {
                 Class<?> propertyType = propertyDescriptor.getPropertyType();
-                if (SUPPORTED_TYPES.contains(propertyType)) {
-                    scanSupportedValue(propertyDescriptor, config, path)
+                if (propertyType.isPrimitive() || Primitives.isWrapperType(propertyType) || propertyType == String.class) {
+                    scanSupportedValue(propertyDescriptor, path)
                             .ifPresent(pathValues::add);
-                } else if (propertyType.isPrimitive()) {
-                    log.trace("Ignore non-supported primitive type '{}' for '{}.{}'",
-                            propertyType, path, propertyDescriptor.getName());
-                } else if (Primitives.isWrapperType(propertyType)) {
-                    log.trace("Ignore non-supported wrapper type: {}",
-                            propertyType);
                 } else {
-                    pathValues.addAll(scanValue(propertyDescriptor, config, path, klass));
+                    pathValues.addAll(scanValue(propertyDescriptor, path, klass));
                 }
             }
         } catch (IntrospectionException e) {
@@ -125,23 +118,17 @@ public class DefaultKonfigReader implements KonfigReader {
         return pathValues;
     }
 
-    private List<PathValue> scanValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path, Class<?> klass) {
+    private List<PathValue> scanValue(PropertyDescriptor propertyDescriptor, List<String> path, Class<?> klass) {
         List<String> newPath = ImmutableList.<String>builder()
                 .addAll(path)
                 .add(propertyDescriptor.getName())
                 .build();
 
-        if (config instanceof Map) {
-            Object child = ((Map) config).get(propertyDescriptor.getName());
-            log.trace("Handling child: {} => {}", klass.getName(), propertyDescriptor.getName());
-            return doScan(propertyDescriptor.getPropertyType(), child, newPath);
-        } else {
-            log.trace("{}: {} is not a map", newPath, config);
-            return Collections.emptyList();
-        }
+        log.trace("Handling child: {} => {}", klass.getName(), propertyDescriptor.getName());
+        return doScan(propertyDescriptor.getPropertyType(), newPath);
     }
 
-    private Optional<PathValue> scanSupportedValue(PropertyDescriptor propertyDescriptor, Object config, List<String> path) {
+    private Optional<PathValue> scanSupportedValue(PropertyDescriptor propertyDescriptor, List<String> path) {
         Method writeMethod = propertyDescriptor.getWriteMethod();
         if (writeMethod == null) {
             log.trace("There's no writer method. Path:{}, Property:{}",
