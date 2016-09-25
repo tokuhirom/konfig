@@ -31,44 +31,6 @@ config loads it.
 
     java -Dconfig.file=path/to/config.yml
 
-## Customize your config reader
-
-### setConfigFilePrefix
-
-Set prefix of configuration file resource.
-
-Default value is `config-`.
-
-```java
-ConfigReader configReader = ConfigReaderBuilder.create()
-    .setConfigFilePrefix("application-")
-    .build();
-```
-
-### setConfigFileProperty
-
-Set configuration file name property name.
-
-Default value is `config.file`.
-
-```java
-ConfigReader configReader = ConfigReaderBuilder.create()
-    .setConfigFileProperty("config.location")
-    .build();
-```
-
-### setConfigProfileProperty
-
-Set property name for configuration profile.
-
-Default value is `config.profile`.
-
-```java
-ConfigReader configReader = ConfigReaderBuilder.create()
-    .setConfigProfileProperty("myapp.env")
-    .build();
-```
-
 ## Overwrite configuration at runtime
 
 You can overwrite configurations at runtime by environment variable and
@@ -116,6 +78,44 @@ freemarker: !resource config/freemarker-devel.yml
 `!file` includes YAML from file.
 
 `!resource` includes YAML from classpath.
+
+## Customize your config reader
+
+### setConfigFilePrefix
+
+Set prefix of configuration file resource.
+
+Default value is `config-`.
+
+```java
+ConfigReader configReader = ConfigReaderBuilder.create()
+    .setConfigFilePrefix("application-")
+    .build();
+```
+
+### setConfigFileProperty
+
+Set configuration file name property name.
+
+Default value is `config.file`.
+
+```java
+ConfigReader configReader = ConfigReaderBuilder.create()
+    .setConfigFileProperty("config.location")
+    .build();
+```
+
+### setConfigProfileProperty
+
+Set property name for configuration profile.
+
+Default value is `config.profile`.
+
+```java
+ConfigReader configReader = ConfigReaderBuilder.create()
+    .setConfigProfileProperty("myapp.env")
+    .build();
+```
 
 ## Supported Java version
 
