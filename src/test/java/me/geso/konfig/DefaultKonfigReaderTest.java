@@ -92,6 +92,7 @@ public class DefaultKonfigReaderTest {
     }
 
     // Hack: http://stackoverflow.com/questions/318239/how-do-i-set-environment-variables-from-java
+    @SuppressWarnings("unchecked")
     protected static void setEnv(Map<String, String> newenv) {
         try {
             Class<?> processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment");

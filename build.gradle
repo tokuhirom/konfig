@@ -10,6 +10,10 @@ repositories {
     mavenCentral()
 }
 
+tasks.withType(JavaCompile) {
+    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation" << '-parameters'
+}
+
 dependencies {
     compile "com.fasterxml.jackson.core:jackson-databind:2.8.3"
     compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.3"
