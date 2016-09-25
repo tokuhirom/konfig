@@ -5,7 +5,7 @@ Tiny config loader for Java
 ## SYNOPSIS
 
 ```java
-ConfigReader reader = new ConfigReaderBuilder()
+ConfigReader reader = ConfigReaderBuilder.create()
         .build();
 ConfigFile config = reader.read(ConfigFile.class);
 ```
