@@ -14,7 +14,7 @@ ConfigFile config = reader.read(ConfigFile.class);
 
 ### Load from resources
 
-TinyConfig loads `tinyconfig-${profile}.yml` from resource by default.
+TinyConfig loads `config-${profile}.yml` from resource by default.
 Default `$profile` is `local`. You can overwrite `$profile` by `-Dconfig.profile`
 system property.
 
