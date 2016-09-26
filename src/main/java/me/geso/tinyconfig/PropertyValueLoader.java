@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Load configuration value from system property
+ */
 @Slf4j
 public class PropertyValueLoader implements ValueLoader {
     @Override
